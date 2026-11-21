@@ -1,0 +1,50 @@
+name: Build mod APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download original APK and UndertaleModCli
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo ${{ github.repository }} --pattern "app.apk"
+          unzip -j app.apk assets/game.droid -d .
+          REPO=UnderminersTeam/UndertaleModTool
+          NAME=$(gh release view --repo $REPO --json assets --jq '.assets[].name' | grep -i cli | grep -iE 'ubuntu|linux' | head -1)
+          echo "Chosen: $NAME"
+          gh release download --repo $REPO --pattern "$NAME"
+          mkdir cli && unzip -q "$NAME" -d cli
+          chmod +x cli/UndertaleModCli
+
+      - name: Patch game.droid
+        run: |
+          ./cli/UndertaleModCli load --help || true
+          ./cli/UndertaleModCli load game.droid --scripts overlay.csx --output game_mod.droid
+          ls -la game.droid game_mod.droid
+          if cmp -s game.droid game_mod.droid; then echo "ERROR: game.droid was not modified"; exit 1; fi
+
+      - name: Repack, align and sign
+        run: |
+          cp app.apk mod.apk
+          zip -q -d mod.apk "META-INF/*" || true
+          mkdir -p assets && cp game_mod.droid assets/game.droid
+          zip -q mod.apk assets/game.droid
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/zipalign -p -f 4 mod.apk aligned.apk
+          keytool -genkeypair -keystore my.jks -alias key -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass android -keypass android -dname "CN=mod"
+          $BT/apksigner sign --ks my.jks --ks-pass pass:android --key-pass pass:android \
+            --out PacMan-mod.apk aligned.apk
+          $BT/apksigner verify PacMan-mod.apk
+          ls -la PacMan-mod.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PacMan-mod
+          path: PacMan-mod.apk
