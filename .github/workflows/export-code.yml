@@ -38,7 +38,7 @@ jobs:
       - name: Dump code
         run: |
           mkdir -p code_out
-          ./cli/UndertaleModCli dump game.droid --code -o code_out || ./cli/UndertaleModCli dump game.droid -c -o code_out || true
+          ./cli/UndertaleModCli dump game.droid -c UMT_DUMP_ALL -o code_out
           echo "Files dumped:"; find code_out -type f | wc -l
 
       - name: Build report
