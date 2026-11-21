@@ -34,6 +34,7 @@ jobs:
         run: |
           {
             echo "=== lib/ contents ==="
+            echo "=== assets ==="; ls -la apktool_out/assets 2>/dev/null; find apktool_out -size +5M -type f -exec ls -la {} \;
             ls -R apktool_out/lib 2>/dev/null || echo "no lib/ folder"
             echo
             echo "=== files mentioning ghost logic ==="
