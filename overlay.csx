@@ -87,7 +87,7 @@ else
 {
     draw_set_color(c_gray);
 }
-draw_rectangle(3, 3, 11, 11, false);
+draw_rectangle(12, 108, 24, 120, false);
 draw_set_color(c_white);
 ";
 
@@ -97,7 +97,7 @@ if (!variable_global_exists(""ghostDbg""))
 {
     global.ghostDbg = true;
 }
-if (keyboard_check_pressed(ord(""G"")) || (device_mouse_check_button_pressed(0, mb_left) && device_mouse_x(0) < 48 && device_mouse_y(0) < 20))
+if (keyboard_check_pressed(ord(""G"")) || (device_mouse_check_button_pressed(0, mb_left) && device_mouse_x(0) < 44 && device_mouse_y(0) > 96 && device_mouse_y(0) < 130))
 {
     global.ghostDbg = !global.ghostDbg;
 }
