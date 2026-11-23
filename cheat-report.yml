@@ -1,0 +1,50 @@
+name: Cheat report
+
+on:
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK and UndertaleModCli
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo ${{ github.repository }} --pattern "app.apk"
+          unzip -j app.apk assets/game.droid -d .
+          REPO=UnderminersTeam/UndertaleModTool
+          NAME=$(gh release view --repo $REPO --json assets --jq '.assets[].name' | grep -i cli | grep -iE 'ubuntu|linux' | head -1)
+          gh release download --repo $REPO --pattern "$NAME"
+          mkdir cli && unzip -q "$NAME" -d cli
+          chmod +x cli/UndertaleModCli
+
+      - name: Dump code
+        run: |
+          mkdir -p code_out
+          ./cli/UndertaleModCli dump game.droid -c UMT_DUMP_ALL -o code_out
+          find code_out -type f | wc -l
+
+      - name: Build report
+        run: |
+          cd code_out/CodeEntries
+          {
+            echo "=== FILE LIST ==="
+            ls
+            echo
+            echo "=== KEY VARIABLES (file:line:text) ==="
+            grep -nE "playerLives|playerScore|stageNo|difficulty|bonusAt|extraLife|changeTimes|frightTime|scaredTime|powerpellet =|chompedGhosts|scaredGhosts|sc_setlevel|sc_newlevel" gml_* Timeline_* 2>/dev/null | cut -c1-230
+            echo
+            echo "=== FULL TEXT OF LIKELY KEY FILES (first 160 lines each) ==="
+            for f in $(ls | grep -iE "level|stage|speed|newgame|reset|lifelost|enemycollision|o_Game_Create|o_Game_PreCreate|o_Menu_Step"); do
+              echo
+              echo "##### $f"
+              head -n 160 "$f"
+            done
+          } > ../../cheat_report.txt
+          wc -l ../../cheat_report.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cheat_report
+          path: cheat_report.txt
