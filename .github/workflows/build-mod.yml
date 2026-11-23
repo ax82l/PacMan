@@ -29,6 +29,23 @@ jobs:
           ls -la game.droid game_mod.droid
           if cmp -s game.droid game_mod.droid; then echo "ERROR: game.droid was not modified"; exit 1; fi
 
+      - name: Verify patch
+        run: |
+          mkdir chk
+          ./cli/UndertaleModCli dump game_mod.droid -c gml_GlobalScript_sc_settarget gml_Object_o_Enemy_PreCreate_0 Timeline_lifelost_5 Timeline_lifelostFull_5 gml_Object_o_Game_Step_2 gml_Object_o_Game_Draw_64 -o chk
+          find chk -type f
+          D=chk/CodeEntries
+          grep -q "gcForce" $D/gml_GlobalScript_sc_settarget.gml || { echo "FAIL: sc_settarget not patched (forced modes)"; exit 1; }
+          grep -q "gcPinX" $D/gml_GlobalScript_sc_settarget.gml || { echo "FAIL: sc_settarget not patched (pinned target)"; exit 1; }
+          grep -q "gcPin" $D/gml_Object_o_Enemy_PreCreate_0.gml || { echo "FAIL: Enemy PreCreate has no gcPin"; exit 1; }
+          grep -q "PIN TARGETS" $D/gml_Object_o_Game_Draw_64.gml || { echo "FAIL: pin page missing in menu"; exit 1; }
+          grep -q "gcForce" $D/gml_Object_o_Enemy_PreCreate_0.gml || { echo "FAIL: Enemy PreCreate not patched"; exit 1; }
+          grep -q "ghostCheat" $D/Timeline_lifelost_5.gml || { echo "FAIL: lifelost_5 not patched"; exit 1; }
+          grep -q "ghostCheat" $D/Timeline_lifelostFull_5.gml || { echo "FAIL: lifelostFull_5 not patched"; exit 1; }
+          grep -q "gcInit" $D/gml_Object_o_Game_Step_2.gml || { echo "FAIL: Step_2 not patched"; exit 1; }
+          grep -q "CHEAT" $D/gml_Object_o_Game_Draw_64.gml || { echo "FAIL: Draw_64 not patched"; exit 1; }
+          echo "All patches verified."
+
       - name: Repack, align and sign
         run: |
           cp app.apk mod.apk
