@@ -226,6 +226,93 @@ for (int i = 0; i < 4; i++)
         .Replace("@@B2@@", (i * 3 + 2).ToString()));
 }
 
+// ---------- teleport page (0 = Pac-Man, 1..4 = ghosts) ----------
+string[] O = new string[] { "o_Player", "o_Blinky", "o_Pinky", "o_Inky", "o_Clyde" };
+
+var tpHere = new StringBuilder();
+var tpNow = new StringBuilder();
+var tpFace = new StringBuilder();
+for (int k = 0; k < 5; k++)
+{
+    tpHere.Append("if (global.gcTpWho == " + k + ")\n{\n    with (" + O[k] + ")\n    {\n        global.gcTpX[" + k + "] = floor(x / 8);\n        global.gcTpY[" + k + "] = floor(y / 8);\n    }\n}\n");
+    string stateFix = "";
+    if (k > 0)
+    {
+        stateFix = "        if (state != \"active\")\n        {\n            state = \"active\";\n        }\n";
+    }
+    tpNow.Append("if (global.gcTpWho == " + k + ")\n{\n    with (" + O[k] + ")\n    {\n        x = global.gcTpX[" + k + "] * 8 + 4;\n        y = global.gcTpY[" + k + "] * 8 + 4;\n        tileX = global.gcTpX[" + k + "];\n        tileY = global.gcTpY[" + k + "];\n" + stateFix + "    }\n}\n");
+    tpFace.Append("if (global.gcTpWho == " + k + ")\n{\n    with (" + O[k] + ")\n    {\n        facing = (facing + _gcD) % 4;\n    }\n}\n");
+}
+
+string tpCases = @"
+                    case 0:
+                        if (_gcRight)
+                        {
+                            global.gcTpWho = (global.gcTpWho + 1) % 5;
+                        }
+                        else
+                        {
+                            global.gcTpWho = (global.gcTpWho + 4) % 5;
+                        }
+                        break;
+                    case 1:
+                        if (_gcRight)
+                        {
+                            global.gcTpX[global.gcTpWho] = min(34, global.gcTpX[global.gcTpWho] + global.gcCoordStep);
+                        }
+                        else
+                        {
+                            global.gcTpX[global.gcTpWho] = max(-4, global.gcTpX[global.gcTpWho] - global.gcCoordStep);
+                        }
+                        break;
+                    case 2:
+                        if (_gcRight)
+                        {
+                            global.gcTpY[global.gcTpWho] = min(42, global.gcTpY[global.gcTpWho] + global.gcCoordStep);
+                        }
+                        else
+                        {
+                            global.gcTpY[global.gcTpWho] = max(-6, global.gcTpY[global.gcTpWho] - global.gcCoordStep);
+                        }
+                        break;
+                    case 3:
+" + tpHere.ToString() + @"
+                        break;
+                    case 4:
+" + tpNow.ToString() + @"
+                        global.ghostCheat = true;
+                        break;
+                    case 5:
+                        global.gcTpHold[global.gcTpWho] = 1 - global.gcTpHold[global.gcTpWho];
+                        global.ghostCheat = true;
+                        break;
+                    case 6:
+" + tpFace.ToString() + @"
+                        global.ghostCheat = true;
+                        break;
+                    case 7:
+                        if (global.gcCoordStep == 1)
+                        {
+                            global.gcCoordStep = 5;
+                        }
+                        else
+                        {
+                            global.gcCoordStep = 1;
+                        }
+                        break;
+                    case 8:
+                        global.gcPage = 0;
+                        break;
+";
+
+// hold flags: copied to the instances every frame (read by patched sc_enemy / sc_playermove)
+var holdAll = new StringBuilder();
+holdAll.Append("with (o_Player)\n{\n    gcHold = false;\n    if (global.gcTpHold[0] == 1)\n    {\n        gcHold = true;\n    }\n}\n");
+for (int i = 0; i < 4; i++)
+{
+    holdAll.Append("with (o_" + G[i] + ")\n{\n    gcHold = false;\n    if (global.gcTpHold[" + (i + 1) + "] == 1 && chomped == false)\n    {\n        gcHold = true;\n    }\n}\n");
+}
+
 string closeCode = "global.gcOpen = false;\n" + applyAll.ToString() + "\naudio_resume_all();\nrunning = true;\n";
 
 string jumpCode = @"
@@ -263,6 +350,10 @@ if (!variable_global_exists(""gcInit""))
     global.gcPinX = array_create(4, 0);
     global.gcPinY = array_create(4, 0);
     global.gcCoordStep = 1;
+    global.gcTpWho = 0;
+    global.gcTpX = array_create(5, 0);
+    global.gcTpY = array_create(5, 0);
+    global.gcTpHold = array_create(5, 0);
     global.gcStep = 1000;
     global.gcLvStep = 1;
     global.gcLevel = 1;
@@ -300,10 +391,10 @@ if (state == ""playing"" && demo == false)
         else if (global.gcOpen == true)
         {
             var _gcTop = y + 56;
-            var _gcRows = 13;
-            if (global.gcPage == 1)
+            var _gcRows = 14;
+            if (global.gcPage == 2)
             {
-                _gcRows = 14;
+                _gcRows = 9;
             }
             if (_gcX >= 10 && _gcX <= 230 && _gcY >= _gcTop && _gcY < (_gcTop + (_gcRows * 13)))
             {
@@ -396,11 +487,14 @@ if (state == ""playing"" && demo == false)
                         global.gcPage = 1;
                         break;
                     case 12:
+                        global.gcPage = 2;
+                        break;
+                    case 13:
                         _gcDoClose = true;
                         break;
                     }
                 }
-                else
+                else if (global.gcPage == 1)
                 {
                     switch (_gcRow)
                     {
@@ -420,6 +514,18 @@ if (state == ""playing"" && demo == false)
                         break;
                     }
                 }
+                else
+                {
+                    var _gcD = 3;
+                    if (_gcRight)
+                    {
+                        _gcD = 1;
+                    }
+                    switch (_gcRow)
+                    {
+" + tpCases + @"
+                    }
+                }
             }
         }
     }
@@ -428,6 +534,7 @@ if (_gcDoClose == true)
 {
 " + closeCode + @"
 }
+" + holdAll.ToString() + @"
 if (running == true)
 {
 " + stickyAll.ToString() + @"
@@ -477,7 +584,8 @@ rows0.Append(Row(8, "LEVEL", "_v = string(global.gcLevel);", true));
 rows0.Append(Row(9, "LEVEL STEP", "_v = string(global.gcLvStep);", false));
 rows0.Append(Row(10, "GO TO LEVEL", "_v = \"TAP\";", false));
 rows0.Append(Row(11, "PIN TARGETS", "_v = \"OPEN\";", false));
-rows0.Append(Row(12, "CLOSE", "_v = \"TAP\";", false));
+rows0.Append(Row(12, "TELEPORT", "_v = \"OPEN\";", false));
+rows0.Append(Row(13, "CLOSE", "_v = \"TAP\";", false));
 
 var rows1 = new StringBuilder();
 for (int i = 0; i < 4; i++)
@@ -489,6 +597,23 @@ for (int i = 0; i < 4; i++)
 }
 rows1.Append(Row(12, "COORD STEP", "_v = string(global.gcCoordStep);", false));
 rows1.Append(Row(13, "BACK", "_v = \"TAP\";", false));
+
+var rows2 = new StringBuilder();
+rows2.Append(Row(0, "WHO", "_v = \"PACMAN\";\nif (global.gcTpWho == 1) { _v = \"BLINKY\"; }\nif (global.gcTpWho == 2) { _v = \"PINKY\"; }\nif (global.gcTpWho == 3) { _v = \"INKY\"; }\nif (global.gcTpWho == 4) { _v = \"CLYDE\"; }", true));
+rows2.Append(Row(1, "X", "_v = string(global.gcTpX[global.gcTpWho]);", true));
+rows2.Append(Row(2, "Y", "_v = string(global.gcTpY[global.gcTpWho]);", true));
+rows2.Append(Row(3, "FROM HERE", "_v = \"TAP\";", false));
+rows2.Append(Row(4, "TP NOW", "_v = \"TAP\";", false));
+rows2.Append(Row(5, "HOLD", "_v = \"OFF\";\nif (global.gcTpHold[global.gcTpWho] == 1) { _v = \"ON\"; }", false));
+string faceStmt = "_f = 0;\n";
+for (int k = 0; k < 5; k++)
+{
+    faceStmt += "if (global.gcTpWho == " + k + ") { _f = " + O[k] + ".facing; }\n";
+}
+faceStmt += "_v = \"RIGHT\";\nif (_f == 1) { _v = \"UP\"; }\nif (_f == 2) { _v = \"LEFT\"; }\nif (_f == 3) { _v = \"DOWN\"; }";
+rows2.Append(Row(6, "FACE", faceStmt, true));
+rows2.Append(Row(7, "COORD STEP", "_v = string(global.gcCoordStep);", false));
+rows2.Append(Row(8, "BACK", "_v = \"TAP\";", false));
 
 string draw =
 @"
@@ -513,14 +638,20 @@ if (state == ""playing"" && demo == false && variable_global_exists(""gcInit""))
     {
         var _t = y + 56;
         var _v = """";
-        var _rows = 13;
+        var _f = 0;
+        var _rows = 14;
         var _al = 0.92;
         var _title = ""CHEAT MENU"";
         if (global.gcPage == 1)
         {
-            _rows = 14;
             _al = 0.6;
             _title = ""PIN TARGETS"";
+        }
+        if (global.gcPage == 2)
+        {
+            _rows = 9;
+            _al = 0.6;
+            _title = ""TELEPORT"";
         }
         draw_set_alpha(_al);
         draw_set_color(c_black);
@@ -535,9 +666,13 @@ if (state == ""playing"" && demo == false && variable_global_exists(""gcInit""))
         {
 " + rows0.ToString() + @"
         }
-        else
+        else if (global.gcPage == 1)
         {
 " + rows1.ToString() + @"
+        }
+        else
+        {
+" + rows2.ToString() + @"
         }
     }
     draw_set_halign(fa_left);
@@ -559,7 +694,8 @@ group.QueueAppend("gml_Object_o_Clyde_Draw_0", common + clydeExtra);
 
 // per-ghost variables (defaults = natural behaviour, no pin)
 group.QueueAppend("gml_Object_o_Enemy_PreCreate_0",
-    "\nself.gcForce = 0;\nself.gcByUs = false;\nself.gcPin = false;\nself.gcPinX = 0;\nself.gcPinY = 0;\n");
+    "\nself.gcForce = 0;\nself.gcByUs = false;\nself.gcPin = false;\nself.gcPinX = 0;\nself.gcPinY = 0;\nself.gcHold = false;\n");
+group.QueueAppend("gml_Object_o_Player_PreCreate_0", "\nself.gcHold = false;\n");
 
 // forced scatter/chase: replace the phase test inside sc_settarget
 group.QueueFindReplace("gml_GlobalScript_sc_settarget",
@@ -571,6 +707,16 @@ group.QueueFindReplace("gml_GlobalScript_sc_settarget",
 group.QueueFindReplace("gml_GlobalScript_sc_settarget",
     "if (chomped == true)",
     "if (gcPin == true && chomped == false)\n    {\n        targetTileX = gcPinX;\n        targetTileY = gcPinY;\n    }\n    if (chomped == true)");
+
+// HOLD: a held ghost skips its whole movement/state routine (same guard the game uses for frozen ghosts)
+group.QueueFindReplace("gml_GlobalScript_sc_enemy",
+    "frozen == false && stunned == false)",
+    "frozen == false && stunned == false && gcHold == false)");
+
+// HOLD: a held Pac-Man behaves as if walled (he still reads input, so he can turn)
+group.QueueFindReplace("gml_GlobalScript_sc_playermove",
+    "var _walled = false;",
+    "var _walled = false;\n    if (gcHold == true)\n    {\n        _walled = true;\n    }");
 
 // never save high scores in a session where cheats were used
 group.QueueFindReplace("Timeline_lifelost_5",
@@ -586,4 +732,4 @@ group.QueueAppend("gml_Object_o_Game_Draw_64", draw);
 
 group.Import();
 
-ScriptMessage("Overlay v4 (targets + cheat menu + pinned targets) injected.");
+ScriptMessage("Overlay v5 (targets + cheat menu + pins + teleport) injected.");
