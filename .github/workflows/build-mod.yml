@@ -44,6 +44,10 @@ jobs:
           grep -q "ghostCheat" $D/Timeline_lifelostFull_5.gml || { echo "FAIL: lifelostFull_5 not patched"; exit 1; }
           grep -q "gcInit" $D/gml_Object_o_Game_Step_2.gml || { echo "FAIL: Step_2 not patched"; exit 1; }
           grep -q "CHEAT" $D/gml_Object_o_Game_Draw_64.gml || { echo "FAIL: Draw_64 not patched"; exit 1; }
+          grep -q "gcHold" $D/gml_GlobalScript_sc_enemy.gml || { echo "FAIL: sc_enemy hold guard missing"; exit 1; }
+          grep -q "gcHold" $D/gml_GlobalScript_sc_playermove.gml || { echo "FAIL: sc_playermove hold guard missing"; exit 1; }
+          grep -q "gcHold" $D/gml_Object_o_Player_PreCreate_0.gml || { echo "FAIL: Player PreCreate has no gcHold"; exit 1; }
+          grep -q "TELEPORT" $D/gml_Object_o_Game_Draw_64.gml || { echo "FAIL: teleport page missing in menu"; exit 1; }
           echo "All patches verified."
 
       - name: Repack, align and sign
